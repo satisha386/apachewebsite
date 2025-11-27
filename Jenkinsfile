@@ -1,14 +1,14 @@
 pipeline {
     agent any
       environment {
-        DOCKER_IMAGE = 'akshu20791/apachewebsite:latest'
-      //  KUBECONFIG = credentials('kubeconfig')
+        DOCKER_IMAGE = 'anirudev/apachewebsite:latest'
+        KUBECONFIG = credentials('kubeconfig')
     }
 
     stages {
         stage('Clone Git repository') {
             steps {
-                 git 'https://github.com/akshu20791/apachewebsite/'
+                 git 'https://github.com/RaksAniruddha/apachewebsite.git'
             }
         }
         stage('run ansibleplaybook'){
@@ -19,7 +19,7 @@ pipeline {
        stage('Docker Build & Push') {
         steps {
             script {
-                withDockerRegistry([credentialsId: 'docker']) {
+                withDockerRegistry([credentialsId: 'docker', url: 'https://index.docker.io/v1/']) {
                     sh '''
                     echo "Building Docker image..."
                     docker build --no-cache -t $DOCKER_IMAGE -f Dockerfile .
@@ -32,15 +32,20 @@ pipeline {
         }
         stage('Deploy to Kubernetes') {
             steps {
-                script{
-                     kubernetesDeploy (configs: 'deployment.yml' ,kubeconfigId: 'k8sconfig')
-                   
+                script {
+                    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+                        sh '''
+                        echo "Deploying to Kubernetes..."
+                        export KUBECONFIG=$KUBECONFIG_FILE
+
+                        kubectl apply -f deployment.yml
+                        kubectl apply -f service.yml
+
+                        echo "Deployment and Service applied successfully!"
+                        '''
                     }
                 }
             }
         }
     }
-
-
-
-
+}
